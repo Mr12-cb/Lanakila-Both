@@ -1,0 +1,116 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<script src=file:///android_asset/app.js></script>
+<script src="lib/xlsx.full.min.js"></script>
+<style>
+</style>
+</head>
+<body>
+Fitur ini berguna untuk mengimport data secara massal dari tabel ms excel ke aplikasi.<br>
+Format data XLS/XLSX, baris pertama tabel adalah seperti ini :<br>
+<b>ID, Nama, Modal,Harga, Satuan, Stok.</b><br>
+- Perhatikan huruf besar kecil<br>
+- ID adalah kode barang(barcode), harus berisi angka.<br>
+-Nama diisi maksimal 22 karakter.<br>
+-Harga tanpa titik dan koma.<br>
+-Satuan diisi 3 huruf.<br>
+-Stok dalam satuan jual.
+
+Pilih file kemudian tunggu sampai semua selesai. 
+Jika Anda gagal mengimport, maka silahkan restart aplikasi.
+
+<input type="file" id="file" ng-model="csvFile" style="width:100%;" />
+  <br><br>
+ <button onclick="excelExport()" style="width:80%;padding:10px;border:none;background:blue;color:white;"> Import </button>
+
+<script>
+try{
+function excelExport() {
+    var input =document.getElementById("file");
+    if(input.files[0]==null){
+     app.ShowPopup("Tidak ada file dipilih" );
+     return false;
+    }
+    app.ShowProgress( );
+    var reader = new FileReader();
+    reader.onload = function(){
+        var fileData = reader.result;
+        var wb = XLSX.read(fileData, {type : 'binary'});
+        wb.SheetNames.forEach(function(sheetName){
+        var rowObj =XLSX.utils.sheet_to_row_object_array(wb.Sheets[sheetName]);
+        var jsonObj = JSON.stringify(rowObj);
+       // app._95(jsonObj);
+        if(jsonObj.length>2){
+        app.WriteFile( "/sdcard/data-produk.txt", jsonObj);
+        simpanProduk();
+        }
+        });
+     };
+    reader.readAsBinaryString(input.files[0]);
+ }
+
+///simpan produk
+db = app.OpenDatabase("/sdcard/kjn.db");
+app.SaveNumber("noUrutProduk",0);
+ 
+function simpanProduk(){
+       app.ShowProgress( "Menyimpan data..." );
+       dataProduk=app.ReadFile( "/sdcard/data-produk.txt");
+       dJsne= JSON.parse(dataProduk);
+       nextProduk();
+              }
+     
+function nextProduk(){
+   noUrutProduk= app.LoadNumber("noUrutProduk",0);
+   loadDataProduk(noUrutProduk);
+}
+
+function loadDataProduk(index){
+  if(dJsne[index]==undefined){
+ app.ShowPopup("Penyimpanan selesai" );
+ app.SaveNumber("noUrutProduk",0);
+ app.HideProgress()
+ return false;
+    }
+  
+ id=dJsne[index].ID||dJsne[index].Id;
+ nama=dJsne[index].Nama.substr(0,31);
+ modal=dJsne[index].Modal||"0";
+ satuan=dJsne[index].Satuan||"pcs";
+ harga=dJsne[index].Harga||"0";
+ stok=dJsne[index].Stok||"0";
+
+   /// cek data jika kosong insert 
+    db.ExecuteSql( "select id from produk where id="+id+";", [],function (results){
+    if(results.rows.length>0){
+    app.SaveNumber("noUrutProduk",index+1);
+    app.ShowPopup(index +"/"+dJsne.length,"short");
+    nextProduk();
+      }
+    else{
+    db.ExecuteSql( "INSERT INTO produk (id,nama,modal,satuan,harga,stok)" +   
+        " VALUES (?,?,?,?,?,?)", [id,nama,modal,satuan,harga,stok], null, OnError);
+    app.SaveNumber("noUrutProduk",index+1);
+    app.ShowPopup(index +"/"+dJsne.length,"short");
+    nextProduk();
+    }
+    },OnError);
+ 
+}
+
+function OnError( msg )   
+{  
+    app.Alert( "Kesalahan : " + msg );  
+} 
+
+}//try
+catch(err){
+app.ShowPopup(err.message );
+}
+
+    </script>
+    <br><br>
+ </body>
+</html>
